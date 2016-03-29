@@ -23,39 +23,23 @@ case "$1" in
   $PLUGIN_COMMAND_PREFIX:create)
     [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
     [[ ! -d "$PLUGIN_DATA_ROOT/$2" ]] || dokku_log_fail "$PLUGIN_SERVICE service $2 already exists"
-    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"; LINKS_FILE="$SERVICE_ROOT/LINKS"
+    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
 
     if ! docker images | grep -e "^$PLUGIN_IMAGE " | grep -q " $PLUGIN_IMAGE_VERSION " ; then
       dokku_log_fail "$PLUGIN_SERVICE image $PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION not found"
     fi
 
     mkdir -p "$SERVICE_ROOT" || dokku_log_fail "Unable to create service directory"
-    password=$(openssl rand -hex 16)
-    echo "$password" > "$SERVICE_ROOT/PASSWORD"
-    chmod 640 "$SERVICE_ROOT/PASSWORD"
-    touch "$LINKS_FILE"
 
     dokku_log_info1 "Starting container"
-    if [[ -n $POSTGRES_CUSTOM_ENV ]]; then
-      echo "$POSTGRES_CUSTOM_ENV" | tr ';' "\n" > "$SERVICE_ROOT/ENV"
-    else
-      echo "" > "$SERVICE_ROOT/ENV"
-    fi
+    echo "" > "$SERVICE_ROOT/ENV"
+    
     SERVICE_NAME=$(get_service_name "$SERVICE")
-    ID=$(docker run --name "$SERVICE_NAME" -v "$SERVICE_ROOT/data:/var/lib/postgresql/data" -e "POSTGRES_PASSWORD=$password" --env-file="$SERVICE_ROOT/ENV" -d --restart always --label dokku=service --label dokku.service=postgres "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
+    ID=$(docker run --name "$SERVICE_NAME")
     echo "$ID" > "$SERVICE_ROOT/ID"
 
     dokku_log_verbose_quiet "Waiting for container to be ready"
     docker run --rm --link "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
-
-    dokku_log_verbose_quiet "Creating container database"
-    DATABASE_NAME="$(get_database_name "$SERVICE")"
-    docker exec "$SERVICE_NAME" su - postgres -c "createdb -E utf8 $DATABASE_NAME" 2> /dev/null || echo 'Already exists'
-
-    dokku_log_verbose_quiet "Securing connection to database"
-    service_stop "$SERVICE" > /dev/null
-    docker run --rm -i -v "$SERVICE_ROOT/data:/var/lib/postgresql/data" "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION" bash -s < "$(dirname "$0")/scripts/enable_ssl.sh" &> /dev/null
-    service_start "$SERVICE" > /dev/null
 
     dokku_log_info2 "$PLUGIN_SERVICE container created: $SERVICE"
     dokku "$PLUGIN_COMMAND_PREFIX:info" "$SERVICE"
@@ -64,10 +48,8 @@ case "$1" in
   $PLUGIN_COMMAND_PREFIX:destroy)
     [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
     verify_service_name "$2"
-    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"; LINKS_FILE="$SERVICE_ROOT/LINKS"
+    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
     SERVICE_NAME=$(get_service_name "$SERVICE")
-
-    [[ -s "$LINKS_FILE" ]] && dokku_log_fail "Cannot delete linked service"
 
     [[ "$3" == "force" ]] && DOKKU_APPS_FORCE_DELETE=1
     if [[ -z "$DOKKU_APPS_FORCE_DELETE" ]]; then
@@ -95,57 +77,11 @@ case "$1" in
       dokku_log_verbose_quiet "No container exists for $SERVICE"
     fi
 
-    dokku_log_verbose_quiet "Removing data"
-    docker run --rm -v "$SERVICE_ROOT/data:/data" "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION" chmod 777 -R /data
     rm -rf "$SERVICE_ROOT"
 
     dokku_log_info2 "$PLUGIN_SERVICE container deleted: $SERVICE"
     ;;
 
-  $PLUGIN_COMMAND_PREFIX:link)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    [[ -z $3 ]] && dokku_log_fail "Please specify an app to run the command on"
-    verify_app_name "$3"
-    verify_service_name "$2"
-    service_link "$2" "$3"
-    ;;
-
-  $PLUGIN_COMMAND_PREFIX:unlink)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    [[ -z $3 ]] && dokku_log_fail "Please specify an app to run the command on"
-    verify_app_name "$3"
-    verify_service_name "$2"
-    service_unlink "$2" "$3"
-    ;;
-
-  $PLUGIN_COMMAND_PREFIX:export)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    verify_service_name "$2"
-    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
-    SERVICE_NAME="$(get_service_name "$SERVICE")"
-    DATABASE_NAME="$(get_database_name $SERVICE)"
-    PASSWORD=$(cat "$SERVICE_ROOT/PASSWORD")
-
-    [[ -n $SSH_TTY ]] && stty -opost
-    docker exec "$SERVICE_NAME" env PGPASSWORD="$PASSWORD" pg_dump -Fc --no-acl --no-owner -h localhost -U postgres -w "$DATABASE_NAME"
-    status=$?
-    [[ -n $SSH_TTY ]] && stty opost
-    exit $status
-    ;;
-
-  $PLUGIN_COMMAND_PREFIX:import)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    verify_service_name "$2"
-    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
-    SERVICE_NAME="$(get_service_name "$SERVICE")"
-    DATABASE_NAME="$(get_database_name $SERVICE)"
-    PASSWORD=$(cat "$SERVICE_ROOT/PASSWORD")
-
-    if [[ -t 0 ]]; then
-      dokku_log_fail "No data provided on stdin."
-    fi
-    docker exec -i "$SERVICE_NAME" env PGPASSWORD="$PASSWORD" pg_restore -h localhost -cO -d "$DATABASE_NAME" -U postgres -w
-    ;;
 
   $PLUGIN_COMMAND_PREFIX:logs)
     [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
@@ -157,6 +93,9 @@ case "$1" in
     [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
     verify_service_name "$2"
     service_start "$2"
+    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+    SERVICE_NAME="$(get_service_name "$SERVICE")"
+    docker exec "$SERVICE_NAME" /run.sh
     ;;
 
   $PLUGIN_COMMAND_PREFIX:stop)
@@ -173,17 +112,6 @@ case "$1" in
     dokku_log_info1 "Please call dokku ps:restart on all linked apps"
     ;;
 
-  $PLUGIN_COMMAND_PREFIX:connect)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    verify_service_name "$2"
-    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
-    DATABASE_NAME="$(get_database_name $SERVICE)"
-    SERVICE_NAME="$(get_service_name "$SERVICE")"
-    has_tty && SERVICE_TTY_OPTS="-t"
-
-    docker exec -i $SERVICE_TTY_OPTS "$SERVICE_NAME" psql -h localhost -U postgres "$DATABASE_NAME"
-    ;;
-
   $PLUGIN_COMMAND_PREFIX:info)
     [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
     verify_service_name "$2"
@@ -194,57 +122,16 @@ case "$1" in
     service_list
     ;;
 
-  $PLUGIN_COMMAND_PREFIX:clone)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    [[ -z $3 ]] && dokku_log_fail "Please specify a name for the new service"
-    verify_service_name "$2"
-    SERVICE="$2"
-    NEW_SERVICE="$3"
-    dokku "$PLUGIN_COMMAND_PREFIX:create" "$NEW_SERVICE"
-    dokku_log_info1 "Copying data from $SERVICE to $NEW_SERVICE"
-    dokku "$PLUGIN_COMMAND_PREFIX:export" "$SERVICE" | dokku "$PLUGIN_COMMAND_PREFIX:import" "$NEW_SERVICE" > /dev/null 2>&1 || true
-    dokku_log_info1 "Done"
-    ;;
-
-  $PLUGIN_COMMAND_PREFIX:expose)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    verify_service_name "$2"
-    service_port_expose "$2" "${@:3}"
-    ;;
-
-  $PLUGIN_COMMAND_PREFIX:unexpose)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    verify_service_name "$2"
-    service_port_unexpose "$2"
-    ;;
-
-  $PLUGIN_COMMAND_PREFIX:promote)
-    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
-    [[ -z $3 ]] && dokku_log_fail "Please specify an app to run the command on"
-    verify_service_name "$2"
-    verify_app_name "$3"
-    promote "$2" "$3"
-    ;;
-
   help | $PLUGIN_COMMAND_PREFIX:help)
     HELP=$(cat<<EOF
     $PLUGIN_COMMAND_PREFIX:create <name>, Create a $PLUGIN_SERVICE service
     $PLUGIN_COMMAND_PREFIX:destroy <name>, Delete the $PLUGIN_SERVICE service and stop its container if there are no links left
-    $PLUGIN_COMMAND_PREFIX:link <name> <app>, Link the $PLUGIN_SERVICE service to the app
-    $PLUGIN_COMMAND_PREFIX:unlink <name> <app>, Unlink the $PLUGIN_SERVICE service from the app
-    $PLUGIN_COMMAND_PREFIX:export <name>, Export a dump of the $PLUGIN_SERVICE service database
-    $PLUGIN_COMMAND_PREFIX:import <name> < <file>, Import a dump into the $PLUGIN_SERVICE service database
-    $PLUGIN_COMMAND_PREFIX:connect <name>, Connect via psql to a $PLUGIN_SERVICE service
     $PLUGIN_COMMAND_PREFIX:logs <name> [-t], Print the most recent log(s) for this service
     $PLUGIN_COMMAND_PREFIX:restart <name>, Graceful shutdown and restart of the $PLUGIN_SERVICE service container
     $PLUGIN_COMMAND_PREFIX:info <name>, Print the connection information
     $PLUGIN_COMMAND_PREFIX:list, List all $PLUGIN_SERVICE services
-    $PLUGIN_COMMAND_PREFIX:clone <name> <new-name>, Create container <new-name> then copy data from <name> into <new-name>
-    $PLUGIN_COMMAND_PREFIX:expose <name> [port], Expose a $PLUGIN_SERVICE service on custom port if provided (random port otherwise)
-    $PLUGIN_COMMAND_PREFIX:unexpose <name>, Unexpose a previously exposed $PLUGIN_SERVICE service
     $PLUGIN_COMMAND_PREFIX:start <name>, Start a previously stopped $PLUGIN_SERVICE service
     $PLUGIN_COMMAND_PREFIX:stop <name>, Stop a running $PLUGIN_SERVICE service
-    $PLUGIN_COMMAND_PREFIX:promote <name> <app>, Promote service <name> as ${PLUGIN_DEFAULT_ALIAS}_URL in <app>
 EOF
 )
     if [[ -n $DOKKU_API_VERSION ]]; then
