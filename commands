@@ -39,7 +39,23 @@ case "$1" in
     echo "$ID" > "$SERVICE_ROOT/ID"
 
     dokku_log_verbose_quiet "Waiting for container to be ready"
-    docker run --rm --link "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
+    DATABASE_URL=$(dokku config:get $2 DATABASE_URL)
+    COUCHDB_URL=$(dokku config:get $2 COUCHDB_URL)
+    S3ACCESSID=$(dokku config:get $2 S3ACCESSID)
+    S3SECRETKEY=$(dokku config:get $2 S3SECRETKEY)
+    S3REGION=$(dokku config:get $2 S3REGION)
+    S3BACKUPBUCKET=$(dokku config:get $2 S3BACKUPBUCKET)
+
+    docker run \
+      -e DATABASE_URL=$DATABASE_URL \
+      -e COUCHDB_URL=$COUCHDB_URL \
+      -e S3ACCESSID=$S3ACCESSID \
+      -e S3SECRETKEY=$S3SECRETKEY \
+      -e S3REGION=$S3REGION \
+      -e S3BACKUPBUCKET=$S3BACKUPBUCKET \
+      "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
+
+    docker exec "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" /schedule.sh
 
     dokku_log_info2 "$PLUGIN_SERVICE container created: $SERVICE"
     dokku "$PLUGIN_COMMAND_PREFIX:info" "$SERVICE"
@@ -80,6 +96,12 @@ case "$1" in
     rm -rf "$SERVICE_ROOT"
 
     dokku_log_info2 "$PLUGIN_SERVICE container deleted: $SERVICE"
+    ;;
+
+
+  $PLUGIN_COMMAND_PREFIX:now)    
+    SERVICE_NAME=$(get_service_name "$SERVICE")
+    docker exec "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" /run.sh
     ;;
 
 
