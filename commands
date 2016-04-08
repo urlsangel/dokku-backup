@@ -35,7 +35,9 @@ case "$1" in
     echo "" > "$SERVICE_ROOT/ENV"
     
     SERVICE_NAME=$(get_service_name "$SERVICE")
-    ID=$(docker run --name "$SERVICE_NAME" -d --restart always --label dokku=service --label dokku.service=s3backup "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
+    dokku_log_info1 "SERVICE_NAME: $SERVICE_NAME"
+    ID=$(docker run --name "$SERVICE_NAME" --label dokku=service --label dokku.service=postgres "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
+
     echo "$ID" > "$SERVICE_ROOT/ID"
 
     dokku_log_verbose_quiet "Waiting for container to be ready"
@@ -45,6 +47,7 @@ case "$1" in
     S3SECRETKEY=$(dokku config:get $2 S3SECRETKEY)
     S3REGION=$(dokku config:get $2 S3REGION)
     S3BACKUPBUCKET=$(dokku config:get $2 S3BACKUPBUCKET)
+
 
     dokku_log_info1 "DATABASE_URL: $DATABASE_URL"
     dokku_log_info1 "COUCHDB_URL: $COUCHDB_URL"
