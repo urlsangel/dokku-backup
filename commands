@@ -46,6 +46,14 @@ case "$1" in
     S3REGION=$(dokku config:get $2 S3REGION)
     S3BACKUPBUCKET=$(dokku config:get $2 S3BACKUPBUCKET)
 
+
+    dokku_log_info1 "DATABASE_URL: $DATABASE_URL"
+    dokku_log_info1 "COUCHDB_URL: $COUCHDB_URL"
+    dokku_log_info1 "S3ACCESSID: $S3ACCESSID"
+    dokku_log_info1 "S3SECRETKEY: $S3SECRETKEY"
+    dokku_log_info1 "S3REGION: $S3REGION"
+    dokku_log_info1 "S3BACKUPBUCKET: $S3BACKUPBUCKET"
+
     docker run \
       -e DATABASE_URL=$DATABASE_URL \
       -e COUCHDB_URL=$COUCHDB_URL \
@@ -53,7 +61,7 @@ case "$1" in
       -e S3SECRETKEY=$S3SECRETKEY \
       -e S3REGION=$S3REGION \
       -e S3BACKUPBUCKET=$S3BACKUPBUCKET \
-      "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
+      --rm "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
 
     docker exec "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" /schedule.sh
 
