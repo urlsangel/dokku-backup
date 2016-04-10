@@ -113,7 +113,8 @@ service_stop() {
 
 service_url() {
   local SERVICE="$1"
-  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local SERVICE_NAME="$(get_service_name "$SERVICE")"
+  echo "http://$SERVICE_NAME"
 }
 
 is_container_status () {
