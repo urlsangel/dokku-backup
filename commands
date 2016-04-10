@@ -35,8 +35,7 @@ case "$1" in
     echo "" > "$SERVICE_ROOT/ENV"
     
     SERVICE_NAME=$(get_service_name "$SERVICE")
-    dokku_log_info1 "SERVICE_NAME: $SERVICE_NAME"
-    ID=$(docker run --name "$SERVICE_NAME" --label dokku=service --label dokku.service=postgres "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
+    ID=$(docker run --name "$SERVICE_NAME" -d --restart always --label dokku=service --label dokku.service=s3backup "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
 
     echo "$ID" > "$SERVICE_ROOT/ID"
 
@@ -63,9 +62,8 @@ case "$1" in
       -e S3SECRETKEY=$S3SECRETKEY \
       -e S3REGION=$S3REGION \
       -e S3BACKUPBUCKET=$S3BACKUPBUCKET \
+      -e SCHEDULE=@daily
       --rm "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
-
-    docker exec "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" /schedule.sh
 
     dokku_log_info2 "$PLUGIN_SERVICE container created: $SERVICE"
     dokku "$PLUGIN_COMMAND_PREFIX:info" "$SERVICE"
