@@ -54,7 +54,8 @@ case "$1" in
     dokku_log_info1 "PLUGIN_IMAGE_VERSION: $PLUGIN_IMAGE_VERSION"
     dokku_log_verbose_quiet "Waiting for container to be ready"
     ID=$(docker run --name "$SERVICE_NAME" -e DATABASE_URL=$DATABASE_URL -e COUCHDB_URL=$COUCHDB_URL -e S3ACCESSID=$S3ACCESSID -e S3SECRETKEY=$S3SECRETKEY -e S3REGION=$S3REGION -e S3BACKUPBUCKET=$S3BACKUPBUCKET -e SCHEDULE=@daily -d --restart always --label dokku=service --label dokku.service=s3backup "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
-
+    
+    service_start "$SERVICE" > /dev/null
     dokku_log_info1 "ID: $ID"
     echo "$ID" > "$SERVICE_ROOT/ID"
 
