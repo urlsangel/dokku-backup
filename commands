@@ -35,8 +35,12 @@ case "$1" in
     echo "" > "$SERVICE_ROOT/ENV"
     
     SERVICE_NAME=$(get_service_name "$SERVICE")
+    dokku_log_info1 "Service name: $SERVICE_NAME"
+    dokku_log_info1 "PLUGIN_IMAGE: $PLUGIN_IMAGE"
+    dokku_log_info1 "PLUGIN_IMAGE_VERSION: $PLUGIN_IMAGE_VERSION"
     ID=$(docker run --name "$SERVICE_NAME" -d --restart always --label dokku=service --label dokku.service=s3backup "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
 
+    dokku_log_info1 "ID: $ID"
     echo "$ID" > "$SERVICE_ROOT/ID"
 
     dokku_log_verbose_quiet "Waiting for container to be ready"
@@ -55,15 +59,7 @@ case "$1" in
     dokku_log_info1 "S3REGION: $S3REGION"
     dokku_log_info1 "S3BACKUPBUCKET: $S3BACKUPBUCKET"
 
-    docker run \
-      -e DATABASE_URL=$DATABASE_URL \
-      -e COUCHDB_URL=$COUCHDB_URL \
-      -e S3ACCESSID=$S3ACCESSID \
-      -e S3SECRETKEY=$S3SECRETKEY \
-      -e S3REGION=$S3REGION \
-      -e S3BACKUPBUCKET=$S3BACKUPBUCKET \
-      -e SCHEDULE=@daily
-      --rm "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
+    docker run -e DATABASE_URL=$DATABASE_URL -e COUCHDB_URL=$COUCHDB_URL -e S3ACCESSID=$S3ACCESSID -e S3SECRETKEY=$S3SECRETKEY -e S3REGION=$S3REGION -e S3BACKUPBUCKET=$S3BACKUPBUCKET -e SCHEDULE=@daily --rm "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
 
     dokku_log_info2 "$PLUGIN_SERVICE container created: $SERVICE"
     dokku "$PLUGIN_COMMAND_PREFIX:info" "$SERVICE"
