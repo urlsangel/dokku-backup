@@ -33,17 +33,7 @@ case "$1" in
 
     dokku_log_info1 "Starting container"
     echo "" > "$SERVICE_ROOT/ENV"
-    
-    SERVICE_NAME=$(get_service_name "$SERVICE")
-    dokku_log_info1 "Service name: $SERVICE_NAME"
-    dokku_log_info1 "PLUGIN_IMAGE: $PLUGIN_IMAGE"
-    dokku_log_info1 "PLUGIN_IMAGE_VERSION: $PLUGIN_IMAGE_VERSION"
-    ID=$(docker run --name "$SERVICE_NAME" -d --restart always --label dokku=service --label dokku.service=s3backup "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
 
-    dokku_log_info1 "ID: $ID"
-    echo "$ID" > "$SERVICE_ROOT/ID"
-
-    dokku_log_verbose_quiet "Waiting for container to be ready"
     DATABASE_URL=$(dokku config:get $2 DATABASE_URL)
     COUCHDB_URL=$(dokku config:get $2 COUCHDB_URL)
     S3ACCESSID=$(dokku config:get $2 S3ACCESSID)
@@ -51,15 +41,22 @@ case "$1" in
     S3REGION=$(dokku config:get $2 S3REGION)
     S3BACKUPBUCKET=$(dokku config:get $2 S3BACKUPBUCKET)
 
-
     dokku_log_info1 "DATABASE_URL: $DATABASE_URL"
     dokku_log_info1 "COUCHDB_URL: $COUCHDB_URL"
     dokku_log_info1 "S3ACCESSID: $S3ACCESSID"
     dokku_log_info1 "S3SECRETKEY: $S3SECRETKEY"
     dokku_log_info1 "S3REGION: $S3REGION"
     dokku_log_info1 "S3BACKUPBUCKET: $S3BACKUPBUCKET"
+    
+    SERVICE_NAME=$(get_service_name "$SERVICE")
+    dokku_log_info1 "Service name: $SERVICE_NAME"
+    dokku_log_info1 "PLUGIN_IMAGE: $PLUGIN_IMAGE"
+    dokku_log_info1 "PLUGIN_IMAGE_VERSION: $PLUGIN_IMAGE_VERSION"
+    dokku_log_verbose_quiet "Waiting for container to be ready"
+    ID=$(docker run --name "$SERVICE_NAME" -e DATABASE_URL=$DATABASE_URL -e COUCHDB_URL=$COUCHDB_URL -e S3ACCESSID=$S3ACCESSID -e S3SECRETKEY=$S3SECRETKEY -e S3REGION=$S3REGION -e S3BACKUPBUCKET=$S3BACKUPBUCKET -e SCHEDULE=@daily -d --restart always --label dokku=service --label dokku.service=s3backup "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
 
-    docker run -e DATABASE_URL=$DATABASE_URL -e COUCHDB_URL=$COUCHDB_URL -e S3ACCESSID=$S3ACCESSID -e S3SECRETKEY=$S3SECRETKEY -e S3REGION=$S3REGION -e S3BACKUPBUCKET=$S3BACKUPBUCKET -e SCHEDULE=@daily --rm "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
+    dokku_log_info1 "ID: $ID"
+    echo "$ID" > "$SERVICE_ROOT/ID"
 
     dokku_log_info2 "$PLUGIN_SERVICE container created: $SERVICE"
     dokku "$PLUGIN_COMMAND_PREFIX:info" "$SERVICE"
