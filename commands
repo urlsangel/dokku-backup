@@ -104,9 +104,11 @@ case "$1" in
     ;;
 
 
-  $PLUGIN_COMMAND_PREFIX:now)    
-    SERVICE_NAME=$(get_service_name "$SERVICE")
-    docker exec "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" -e SCHEDULE=**None** /run.sh
+  $PLUGIN_COMMAND_PREFIX:now)   
+    [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
+    verify_service_name "$2" 
+    SERVICE_NAME=$(get_service_name "$2")
+    docker exec "$SERVICE_NAME" -e SCHEDULE=**None** /run.sh
     ;;
 
 
