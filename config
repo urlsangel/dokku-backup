@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 export S3BACKUP_IMAGE=${S3BACKUP_IMAGE:="urlsangel/s3backup"}
-export S3BACKUP_IMAGE_VERSION=${S3BACKUP_IMAGE_VERSION:="1.0.10"}
+export S3BACKUP_IMAGE_VERSION=${S3BACKUP_IMAGE_VERSION:="1.0.11"}
 export S3BACKUP_ROOT=${S3BACKUP_ROOT:="/var/lib/dokku/services/s3backup"}
 
 export PLUGIN_COMMAND_PREFIX="s3backup"
