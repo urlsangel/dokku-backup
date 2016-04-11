@@ -1,4 +1,4 @@
 [plugin]
 description = "dokku s3backup service plugin"
-version = "1.0.3"
+version = "1.0.4"
 [plugin.config]
