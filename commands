@@ -23,16 +23,16 @@ case "$1" in
   $PLUGIN_COMMAND_PREFIX:create)
     [[ -z $2 ]] && dokku_log_fail "Please specify a name for the service"
     [[ ! -d "$PLUGIN_DATA_ROOT/$2" ]] || dokku_log_fail "$PLUGIN_SERVICE service $2 already exists"
-    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+    SERVICE="$2"; SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"; LINKS_FILE="$SERVICE_ROOT/LINKS"
 
     if ! docker images | grep -e "^$PLUGIN_IMAGE " | grep -q " $PLUGIN_IMAGE_VERSION " ; then
       dokku_log_fail "$PLUGIN_SERVICE image $PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION not found"
     fi
 
     mkdir -p "$SERVICE_ROOT" || dokku_log_fail "Unable to create service directory"
+    touch "$LINKS_FILE"
 
     dokku_log_info1 "Starting container"
-    echo "" > "$SERVICE_ROOT/ENV"
 
     DATABASE_URL=$(dokku config:get $2 DATABASE_URL)
     COUCHDB_URL=$(dokku config:get $2 COUCHDB_URL)
@@ -54,13 +54,13 @@ case "$1" in
     dokku_log_info1 "PLUGIN_IMAGE_VERSION: $PLUGIN_IMAGE_VERSION"
     dokku_log_verbose_quiet "Waiting for container to be ready"
     ID=$(docker run --name "$SERVICE_NAME" -e DATABASE_URL=$DATABASE_URL -e COUCHDB_URL=$COUCHDB_URL -e S3ACCESSID=$S3ACCESSID -e S3SECRETKEY=$S3SECRETKEY -e S3REGION=$S3REGION -e S3BACKUPBUCKET=$S3BACKUPBUCKET -e SCHEDULE=@daily -d --restart always --label dokku=service --label dokku.service=s3backup "$PLUGIN_IMAGE:$PLUGIN_IMAGE_VERSION")
-    docker run --rm --link "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
-    service_start "$SERVICE" > /dev/null
-    dokku_log_info1 "ID: $ID"
-    echo "$ID" > "$SERVICE_ROOT/ID"
+    # docker run --rm --link "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
+    # service_start "$SERVICE" > /dev/null
+    # dokku_log_info1 "ID: $ID"
+    # echo "$ID" > "$SERVICE_ROOT/ID"
 
-    dokku_log_info2 "$PLUGIN_SERVICE container created: $SERVICE"
-    dokku "$PLUGIN_COMMAND_PREFIX:info" "$SERVICE"
+    # dokku_log_info2 "$PLUGIN_SERVICE container created: $SERVICE"
+    # dokku "$PLUGIN_COMMAND_PREFIX:info" "$SERVICE"
     ;;
 
   $PLUGIN_COMMAND_PREFIX:destroy)
