@@ -57,7 +57,8 @@ case "$1" in
     echo "$ID" > "$SERVICE_ROOT/ID"
 
     dokku_log_verbose_quiet "Waiting for container to be ready"
-    # docker run --rm --link "$SERVICE_NAME:$PLUGIN_COMMAND_PREFIX" dokkupaas/wait > /dev/null
+    dokku postgres:link other_service playground
+    docker run --rm --link "$SERVICE_NAME:dokku-postgres-$SERVICE" dokkupaas/wait > /dev/null
     
     service_start "$SERVICE" > /dev/null
     dokku_log_info1 "ID: $ID"
